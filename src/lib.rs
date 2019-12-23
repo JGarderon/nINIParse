@@ -36,18 +36,22 @@ pub enum INIContext {
 } 
 
 impl INIContext { 
-	pub fn new( chemin: &str ) -> Result<INITree, String> { 
+	pub fn new( chemin: &str, strict: bool ) -> Result<INITree, String> { 
 		let f = File::open( chemin ); 
 		match f { 
 			Ok( mut reader ) => { 
 				let mut buffer = String::new(); 
 				// ! \ Attention, tout le fichier est chargé en mémoire 
 				if let Ok(_) = reader.read_to_string( &mut buffer ) { 
-					return Result::Ok( INIContext::parse_string( &mut buffer ) ); 
+					match INIContext::parse_string( &mut buffer, strict ) { 
+						Result::Ok( arbre ) => return Result::Ok( arbre ), 
+						Result::Err( err ) => return Result::Err( format!( 
+							"le fichier n'est pas correct, position : {:?}", 
+							err 
+						) ) 
+					} 
 				} else { 
-					panic!( 
-						"Oups ! le fichier ne peut pas être lu" 
-					) 
+					return Result::Err( "Oups ! le fichier ne peut pas être lu".to_string() ); 
 				} 
 			}, 
 			Err( err ) => return Result::Err( format!( 
@@ -57,7 +61,7 @@ impl INIContext {
 		} 
 		
 	}
-	pub fn parse_string( buffer: &mut String ) -> INITree { 
+	pub fn parse_string( buffer: &mut String, strict: bool ) -> Result<INITree, usize> { 
 		let mut contexte: INIContext = INIContext::None; 
 		let mut arbre: INITree = INITree { 
 			leaves: Vec::new() 
@@ -66,7 +70,7 @@ impl INIContext {
 			( INIContext::Section, "generaly".to_string() ) 
 		); 
 		let mut portion: Vec<char> = Vec::new(); 
-		for c in buffer.chars() { 
+		for (i, c) in buffer.chars().enumerate() { 
 			match contexte { 
 				INIContext::None => { 
 					match c { 
@@ -77,7 +81,7 @@ impl INIContext {
 							portion.push( c ); 
 							contexte = INIContext::Key; 
 						}, 
-						_ => println!("erreur, caractère non-autorisé : {:?}", c) 
+						_ => if strict { return std::result::Result::Err( i ); } 
 					} 
 				} 
 				INIContext::Key => { 
@@ -91,7 +95,7 @@ impl INIContext {
 							contexte = INIContext::Value; 
 						} 
 						'a'..='z' | 'A'..='Z' | '0'..='9' | '.' | '-' | '_' | '~' => portion.push( c ), 
-						_ => println!("erreur (clé), caractère non-autorisé : {:?}", c) 
+						_ => if strict { return std::result::Result::Err( i ); } 
 					} 
 				} 
 				INIContext::Value => { 
@@ -115,7 +119,7 @@ impl INIContext {
 					match c { 
 						'\r' => (), 
 						'\n' => contexte = INIContext::None, 
-						_ => println!("ligne non trouvée") 
+						_ => if strict { return std::result::Result::Err( i ); } 
 					} 
 				} 
 				INIContext::Section => { 
@@ -150,7 +154,7 @@ impl INIContext {
 				}
 			} 
 		} 
-		arbre 
+		std::result::Result::Ok( arbre ) 
 	} 
 } 
 

@@ -2,7 +2,7 @@
 mod lib; 
 
 fn main() {
-	match lib::INIContext::new( "./test.ini" ) { 
+	match lib::INIContext::new( "./test.ini", true ) { 
 		Ok( tree ) => { 
 			println!( 
 				"{:?} ou {:?}", 
